@@ -12,6 +12,7 @@ A server-authoritative Connect 4 take-home: two players in one browser, games sa
 
 ## Rules
 
+- The repo must run on macOS, Linux and Windows (WSL2), and the app must work in phone browsers over the local network. That address is plain HTTP, so don't rely on browser APIs that need HTTPS, such as `crypto.randomUUID`.
 - The server decides everything. The frontend may disable controls, such as a full column, but the server validates every move. The frontend never computes a winner; it displays what the server returns.
 - The `game` package is pure: no Spring, HTTP or database imports. It copies the board before applying a move.
 - Controllers stay thin. `store` holds the JDBC code.
@@ -22,15 +23,16 @@ A server-authoritative Connect 4 take-home: two players in one browser, games sa
 
 ## Commands
 
-These are planned; they won't work until Phase 2 creates them. Update this section if they change.
+Update this section if any command changes. The development database is on host port 5433, so a locally installed Postgres can keep 5432. On the host, `./mvnw test` needs that database running.
 
 | Command | Purpose |
 | --- | --- |
+| `./scripts/setup.sh [--dev]` | Install the required tools on macOS or Ubuntu; `--dev` adds a JDK, Node and the frontend libraries. If a tool requirement changes, update the script and the PRD together |
 | `docker compose up` | Start the development database only |
 | `cd backend && ./mvnw spring-boot:run` | Run the backend on port 8081 |
 | `cd frontend && npm run dev` | Run Vite at `http://localhost:5173` |
 | `make test` | Run tests in containers against a temporary Postgres, in a separate Compose project |
-| `make up` | Recreate the kind cluster and serve the app at `http://localhost:8080`. **Erases saved games** |
+| `make up` | Recreate the kind cluster and serve the app on port 8080, to this computer and others on the same network. **Erases saved games** |
 | `make down` | Delete the kind cluster. **Erases saved games** |
 
 The host may have a newer JDK, so the build sets `maven.compiler.release` to 21.

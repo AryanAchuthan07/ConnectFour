@@ -13,7 +13,8 @@ Build a polished, server-authoritative Connect 4 that two players can play in on
 - A new player can start, play and finish a game with no instructions.
 - Illegal moves are impossible: the server rejects them, not just the UI.
 - Refreshing the page or reopening the game link resumes the same game.
-- `make up` on a clean machine (with Docker, kind, kubectl and `make` installed) brings the whole stack up.
+- `make up` on a clean machine (with Docker, kind, kubectl and `make` installed) brings the whole stack up. This works on macOS, Linux and Windows through WSL2.
+- While it's running, phones and other computers on the same network can play in a browser.
 - The win-detection logic has unit tests covering every direction and edge case.
 
 **Stack:** Java 21 + Spring Boot backend, React + TypeScript (Vite) frontend, PostgreSQL, Docker, Kubernetes via kind.
@@ -165,7 +166,7 @@ flowchart LR
         backend["backend<br>Java 21 + Spring Boot<br>2 replicas"]
         postgres[("postgres<br>StatefulSet + PVC")]
     end
-    browser -->|"localhost:8080"| frontend
+    browser -->|"port 8080"| frontend
     frontend -->|"/api and /healthz"| backend
     backend -->|"SQL"| postgres
 ```
@@ -184,7 +185,7 @@ Game rules live in a pure `game` package with no HTTP or database code, so they 
 - `backend`: a Deployment with 2 replicas (this shows the backend holds no state) and a Service. It reads `DATABASE_URL` from the Secret. An init container waits for Postgres before the backend starts.
 - Backend health checks: readiness uses `/healthz`, so a pod that can't reach Postgres gets no traffic. Liveness uses `/livez`, so a database outage doesn't restart the backend. A startup probe on `/livez`, with a generous time limit, holds off liveness checks while Java starts and Flyway runs. The trade-off, for `DECISIONS.md`: a pod whose database connections stay stuck loses traffic but isn't restarted.
 - `frontend`: a Deployment and a Service. nginx serves the built static files and forwards `/api` and exactly `/healthz` to the backend Service, so there are no cross-origin (CORS) issues. It doesn't forward `/livez`. Other unknown paths serve the React app, so refreshing `/game/:id` works.
-- Access: a kind port mapping from `localhost:8080` to a fixed NodePort on the frontend Service. The mapping is defined in `k8s/kind.yaml` and set when the cluster is created, and the port numbers there must match the Service. `make up` passes this file to kind and doesn't apply it with the manifests. It waits until everything is ready, prints the URL and exits. The README notes that port 8080 must be free.
+- Access: a kind port mapping from port 8080 on all of the host's network interfaces to a fixed NodePort on the frontend Service. The app is at `http://localhost:8080` on the host and at `http://<host IP>:8080` from other devices on the same network. There are no accounts, so anyone who can reach that address can use the app. Only the app is exposed; the development database accepts local connections only. The mapping is defined in `k8s/kind.yaml` and set when the cluster is created, and the port numbers there must match the Service. `make up` passes this file to kind and doesn't apply it with the manifests. It waits until everything is ready, prints both URLs and exits. The README notes that port 8080 must be free, and that a firewall or a network that isolates devices can block access from other devices.
 
 **Database migrations:** Flyway applies versioned SQL files when the backend starts, which Spring Boot supports out of the box. That's fine for this scope; a real project would use a separate migration job.
 
@@ -199,7 +200,15 @@ Game rules live in a pure `game` package with no HTTP or database code, so they 
 - `make test` uses a separate Compose project, so its cleanup can't remove development data.
 - This setup doesn't use nginx, so run `make up` at the end of each phase from Phase 2 onward to catch differences, such as a failed refresh on `/game/:id`.
 
-**Prerequisites** (listed in the README): Docker with Docker Compose, kind, kubectl and `make`. These are all that's needed to run and test the project. The dev loop also needs a JDK (21 or newer) and Node on the host.
+**Prerequisites** (listed in the README): Docker with Docker Compose and Buildx, kind, kubectl and `make`. These are all that's needed to run and test the project. The dev loop also needs a JDK (21 or newer) and Node (20.19+ or 22.12+) on the host. On Windows, run the commands inside WSL2.
+
+**Setup script:** `./scripts/setup.sh` installs the tools needed to run and test, and `--dev` adds a JDK, Node and the frontend libraries. `--dry-run` shows what it would install. It skips tools that are already there and checks that Docker is running.
+
+- It supports macOS, which needs Homebrew first, and Ubuntu, including Ubuntu on WSL2. On other systems it stops with instructions, and users install the tools themselves.
+- Some first-time steps stay manual, and the script prints them: opening Docker Desktop and accepting its terms, enabling Docker's WSL integration on Windows, and giving a Linux user access to Docker. It doesn't grant that access itself, because it's equivalent to root access.
+- If Docker Desktop on macOS can't start because installing Rosetta failed, choose **Disable Rosetta**. This project doesn't need it. The script and the README say so.
+- On Ubuntu, kind, kubectl and Node are downloaded at fixed versions and checked against checksums in the script.
+- Project libraries aren't listed in the script. Maven reads `pom.xml`, and npm reads `package-lock.json`.
 
 **Running tests:** `make test` runs everything in containers, so the host needs no JDK or Node. It uses Docker Compose to start a separate, empty Postgres and a Maven container, then removes them, whether the tests pass or fail. Game logic tests run without Spring or a database.
 
@@ -221,6 +230,7 @@ backend/   Maven project; packages game (pure logic), store (JDBC), api (control
 frontend/  src/components (Board, Cell, StatusBar), src/api.ts, src/hooks/useGame.ts
 k8s/       kind.yaml (cluster config), postgres.yaml, backend.yaml, frontend.yaml, secret.yaml
 docs/      PRD.md, DECISIONS.md
+scripts/   setup.sh (installs the required tools)
 Makefile   up, down, test
 ```
 
@@ -240,7 +250,7 @@ Work through six phases totalling about 4 hours, with the riskiest part (infrast
 3. **Game logic, storage and API (60 min):** `game` and its tests first, then the migration, the store and the three endpoints. *Done when:* `make test` passes and a full game can be played with curl.
 4. **Frontend (70 min):** board, turn indicator, hover preview, keyboard play, phone layout, game-over banner with winning-line highlight and rematch, routing to `/game/:id`, error handling. Replace the API status display with the home screen; keep the `/healthz` nginx rule for checking the whole stack with curl. *Done when:* a full game can be played in the browser, by mouse or keyboard and on a phone-sized portrait screen, and survives a refresh.
 5. **Polish (15 min):** drop animation with its reduce-motion setting, then trying to break it. *Done when:* nothing obvious breaks.
-6. **Submission (15 min):** README (single command, screenshot or GIF), DECISIONS.md (trade-offs and what's next), the time breakdown and the transcripts. Before submitting, build both images once with `docker build --no-cache --pull`, so cached layers can't hide a broken download or build step. `make up` normally uses the cache.
+6. **Submission (15 min):** README (setup command, single run command, screenshot or GIF), DECISIONS.md (trade-offs and what's next), the time breakdown and the transcripts. Before submitting, build both images once with `docker build --no-cache --pull`, so cached layers can't hide a broken download or build step. `make up` normally uses the cache.
 
 **If a phase overruns by 15 minutes**, cut from Polish first (the drop animation before the break test), never from Must features, tests or the README. If time runs short, still do a brief break test. Only start a stretch feature after phase 6 is done.
 
