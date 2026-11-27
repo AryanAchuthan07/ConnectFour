@@ -1,0 +1,4 @@
+# Keep Unix line endings on every OS. Scripts, the Makefile and files copied into
+# Linux containers can break with Windows line endings.
+* text=auto eol=lf
+*.cmd text eol=crlf
