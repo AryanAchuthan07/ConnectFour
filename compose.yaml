@@ -1,0 +1,20 @@
+# Development database only. The backend and Vite run directly on the host.
+name: connectfour-dev
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: connectfour
+      POSTGRES_USER: connectfour
+      POSTGRES_PASSWORD: connectfour
+    ports:
+      # 5433 on the host, so a locally installed Postgres can keep 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U connectfour -d connectfour"]
+      interval: 5s
+      retries: 20
+volumes:
+  data:

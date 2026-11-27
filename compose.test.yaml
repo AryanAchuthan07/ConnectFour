@@ -1,0 +1,34 @@
+# Used only by `make test`. A separate project, so cleanup can't touch development data.
+name: connectfour-test
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: connectfour
+      POSTGRES_USER: connectfour
+      POSTGRES_PASSWORD: connectfour
+    tmpfs:
+      # In memory, so every run starts empty.
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U connectfour -d connectfour"]
+      interval: 2s
+      retries: 30
+  backend-tests:
+    image: maven:3-eclipse-temurin-21
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/connectfour
+      DATABASE_USER: connectfour
+      DATABASE_PASSWORD: connectfour
+    volumes:
+      - ./backend:/source:ro
+      - maven-cache:/root/.m2
+    # Builds from a copy, so container output never mixes with the host's target/ folder.
+    command: >
+      sh -c "mkdir /work && cp -r /source/pom.xml /source/src /work/ && cd /work && mvn -B test"
+volumes:
+  # Kept between runs so dependencies are downloaded once.
+  maven-cache:

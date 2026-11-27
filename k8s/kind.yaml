@@ -1,0 +1,12 @@
+# Cluster config for `kind create cluster`. Don't `kubectl apply` this file.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: connectfour
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # containerPort must match the frontend Service's nodePort in frontend.yaml.
+      - containerPort: 30080
+        hostPort: 8080
+        # All network interfaces, so phones and other computers on the same network can play.
+        listenAddress: "0.0.0.0"
