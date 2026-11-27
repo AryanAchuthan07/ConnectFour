@@ -13,14 +13,14 @@ Build a polished, server-authoritative Connect 4 that two players can play in on
 - A new player can start, play and finish a game with no instructions.
 - Illegal moves are impossible: the server rejects them, not just the UI.
 - Refreshing the page or reopening the game link resumes the same game.
-- `make up` on a clean machine (with Docker, kind and kubectl installed) brings the whole stack up.
+- `make up` on a clean machine (with Docker, kind, kubectl and `make` installed) brings the whole stack up.
 - The win-detection logic has unit tests covering every direction and edge case.
 
-**S****tack:** Java 21 + Spring Boot backend, React + TypeScript (Vite) frontend, PostgreSQL, Docker, Kubernetes via kind.
+**Stack:** Java 21 + Spring Boot backend, React + TypeScript (Vite) frontend, PostgreSQL, Docker, Kubernetes via kind.
 
 ## Scope
 
-Build the must-haves first. Only start a stretch item when everything above it works and is committed.
+There are three levels. **Must** features are required to submit. **Polish** comes after them and is the first thing cut. **Stretch** items start only after the submission phase is done, in order, and only when everything above them works and is committed.
 
 | Priority | Feature | Why |
 | --- | --- | --- |
@@ -29,9 +29,11 @@ Build the must-haves first. Only start a stretch item when everything above it w
 | Must | Games saved in Postgres, resumable via URL | Gives the database a real job; refreshing never loses a game |
 | Must | Turn indicator, winning-line highlight, draw state, rematch | Makes the game feel finished |
 | Must | One-command local run on Kubernetes | Explicitly requested |
-| Stretch 1 | Drop animation and hover preview of the landing spot | Highest polish payoff for the time |
-| Stretch 2 | Online play from two browsers via a shareable link (polling) | Uses the backend you already have |
-| Stretch 3 | Simple computer opponent (block or win in one, else random) | Solo play |
+| Must | Landing-spot preview for mouse and keyboard | Players should always know where the piece will land |
+| Must | Keyboard play and phone-sized portrait layout | Part of the quality bar, and cheaper to build into the board than to add later |
+| Polish | Drop animation, off when reduce-motion is on | Adds feel, but the game is complete without it |
+| Stretch 1 | Online play from two browsers via a shareable link (polling) | Uses the backend you already have |
+| Stretch 2 | Simple computer opponent (block or win in one, else random) | Solo play |
 
 **Out of scope (goes in "what I'd do next"):** accounts and login, ratings or Elo, WebSockets, chat, game history and replays, a strong AI, production deployment, Helm charts.
 
@@ -39,21 +41,21 @@ Build the must-haves first. Only start a stretch item when everything above it w
 
 Standard Connect 4: a 7-column × 6-row board, and Red always moves first. A move is a column choice; the piece falls to the lowest empty row.
 
-- **Win:** four in a row horizontally, vertically or on either diagonal. The game ends right away and the server returns the four winning cells.
+- **Win:** four or more in a row horizontally, vertically or on either diagonal. The game ends right away and the server returns all winning cells: every cell in every line of four or more through the last piece. This can be more than four cells, when a line is longer than four or one move completes several lines.
 - **Draw:** all 42 cells are filled and nobody has won.
 - **Rejected moves (server returns an error, state unchanged):**
   - column outside 0–6
   - full column
   - game already finished
   - wrong player's turn (matters once online play exists)
-  - stale move: the client's move number doesn't match the server's, for example after a double-click or in a second tab
+  - stale move: the client's move count doesn't match the server's, for example after a double-click or in a second tab
 - **Rematch:** creates a new game; the finished game stays saved.
 
 The win check only needs to look at lines through the last piece placed, which keeps it simple and fast.
 
 ## UX requirements
 
-The player should always know whose turn it is, where the piece will land and why the game ended.
+The player should always know whose turn it is, where the piece will land and why the game ended. The one exception is that touch players get no landing preview before a move.
 
 **Screens:** a home screen with a "New game" button, then the game screen at `/game/:id`. Keep it to those two.
 
@@ -61,17 +63,22 @@ The player should always know whose turn it is, where the piece will land and wh
 
 - The board is the focus: centred, large, with clearly different Red and Yellow pieces.
 - A turn indicator shows the current player's colour.
-- Hovering over a column shows a ghost piece where the move would land. A full column shows as disabled.
+- A full column shows as disabled. The whole column is the click and tap target. How a move is previewed and made depends on the input:
+  - **Mouse:** hovering over a column shows a ghost piece where the move would land, and clicking drops the piece.
+  - **Keyboard:** the selected column shows the ghost piece, arrow keys move between columns, and Enter drops the piece.
+  - **Touch:** one tap drops the piece, with no preview first. No ghost piece remains after the tap.
 - After a move, disable input until the server responds, so a double-click can't send two moves.
-- When the game ends, a banner shows the result ("Red wins" or "Draw"), the winning four are highlighted, and a "Play again" button appears.
-- A server error shows a short, friendly message, never a blank screen.
+- When the game ends, a banner shows the result ("Red wins" or "Draw"), all winning cells are highlighted, and a "Play again" button appears.
+- A server error shows a short, friendly message, never a blank screen. For a network failure or a response it can't read, such as an nginx 502 or 504 page, the frontend shows "Can't reach the server. Please try again."
+- After any 409, the frontend fetches the game again and keeps showing the error message, so an out-of-date tab recovers without a refresh.
+- If the game at the URL can't be loaded because the ID is invalid or unknown, the screen says "We couldn't find that game" and offers a "New game" button.
 
 **Quality bar**
 
 - Works on a phone-sized screen in portrait.
 - Keyboard play: arrow keys pick a column, Enter drops the piece. The focus is visible.
 - Colour isn't the only signal: the turn indicator and result banner also use words.
-- Animation (stretch): the piece drops in about 300 ms; turn it off when the system's reduce-motion setting is on.
+- Animation (polish): the piece drops in about 300 ms; turn it off when the system's reduce-motion setting is on.
 
 ## Data model and API
 
@@ -91,45 +98,110 @@ There are two tables. `games` holds the current state, so loading a game is a si
 
 **moves:** `game_id` (foreign key), `move_number`, `player`, `col`, `created_at`. A unique constraint on (`game_id`, `move_number`) means two moves can never land on the same turn.
 
-**Endpoints** (JSON; every endpoint returns the full game object)
+**Game object** (this example shows Red after winning along the bottom row)
+
+```json
+{
+  "id": "3f2b8c1e-9d4a-4e7b-a1c6-5f0d2e8b9a34",
+  "board": [
+    [".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", "."],
+    [".", ".", ".", ".", ".", ".", "."],
+    ["Y", "Y", "Y", ".", ".", ".", "."],
+    ["R", "R", "R", "R", ".", ".", "."]
+  ],
+  "currentPlayer": "R",
+  "status": "red_won",
+  "winningCells": [[5,0], [5,1], [5,2], [5,3]],
+  "moveCount": 7
+}
+```
+
+- `board` is a 2D array, `board[row][col]`, in both the API and the game logic. The game logic copies it before applying a move. The 42-character string is only the storage format, and the backend converts between the two.
+- Cells and `status` use the same values as the database.
+- `winningCells` is a list of `[row, col]` pairs with no duplicates, sorted by row and then column. It is `null` unless someone has won.
+- `currentPlayer` doesn't switch after the move that ends the game. The UI ignores it once the game is over.
+- Timestamps aren't returned because neither screen uses them.
+
+**Endpoints** (JSON; every game endpoint returns the full game object)
 
 | Method and path | Request body | Responses |
 | --- | --- | --- |
 | `POST /api/games` | none | 201 with the new game |
-| `GET /api/games/{id}` | none | 200, or 404 |
-| `POST /api/games/{id}/moves` | `{"column": 3, "moveNumber": 7}` | 200 with the updated game; 400 for a bad column; 409 for a full column, a stale move number or a finished game; 404 |
-| `GET /healthz` | none | 200; used by the Kubernetes health checks |
+| `GET /api/games/{id}` | none | 200; 400 for an invalid ID; 404 |
+| `POST /api/games/{id}/moves` | `{"column": 3, "moveCount": 7}` | 200 with the updated game; 400 for an invalid request or a bad column; 409 for a full column, a stale move count or a finished game; 404 |
+| `GET /livez` | none | 200 without touching the database; used by the liveness and startup probes |
+| `GET /healthz` | none | 200 with `{"status": "ok"}` if Postgres responds, otherwise 503; used by the readiness probe |
 
 Errors use a single shape: `{"error": {"code": "COLUMN_FULL", "message": "That column is full."}}`. The frontend shows the message as is.
 
-**Move handling:** in one transaction, lock the game row (`SELECT … FOR UPDATE`), check `moveNumber` against `move_count`, run the pure game logic, insert into `moves`, update `games`, then commit.
+**Error checks:** a request can break more than one rule, so the server runs these checks in order and returns the first failure. The API handles checks 1–3, and the `game` package handles checks 4–6. `GET /api/games/{id}` uses only checks 1 and 2.
+
+| Order | Check | Status | Code | Message |
+| --- | --- | --- | --- | --- |
+| 1 | The game ID is valid and, for a move, the body is valid JSON with both fields as integers | 400 | `INVALID_REQUEST` | That request wasn't valid. |
+| 2 | The game exists | 404 | `GAME_NOT_FOUND` | We couldn't find that game. |
+| 3 | The move count matches | 409 | `STALE_MOVE` | The game has changed. Check the board and try again. |
+| 4 | The game is still in progress | 409 | `GAME_OVER` | This game is already over. |
+| 5 | The column is from 0 to 6 | 400 | `INVALID_COLUMN` | That column doesn't exist. |
+| 6 | The column has space | 409 | `COLUMN_FULL` | That column is full. |
+
+Unexpected errors return 500 `INTERNAL_ERROR` with "Something went wrong. Please try again." They use the same shape and don't expose internal details. The wrong-turn rejection gets its place in this order when online play is built, because requests don't yet say which player is moving.
+
+**Move handling:** in one transaction, lock the game row (`SELECT … FOR UPDATE`), check that the request's `moveCount` equals `move_count`, run the pure game logic, insert into `moves` with `move_number = move_count + 1`, update `games` (including incrementing `move_count`), then commit.
+
+**Move counting:** `moveCount` in the request is the number of moves already made, as the client last saw it. The client sends back the game's count unchanged, so the first move of a new game sends `0`. Rows in `moves` are numbered from 1.
 
 ## Architecture
 
 The backend is the single source of truth. The browser sends a column choice, and the backend validates it, saves it and returns the full new game state.
 
-&#91;embedded content: architecture · 3 services in a kind cluster\]
+```mermaid
+flowchart LR
+    browser["Browser"]
+    subgraph cluster["kind cluster"]
+        frontend["frontend<br>nginx + React build"]
+        backend["backend<br>Java 21 + Spring Boot<br>2 replicas"]
+        postgres[("postgres<br>StatefulSet + PVC")]
+    end
+    browser -->|"localhost:8080"| frontend
+    frontend -->|"/api and /healthz"| backend
+    backend -->|"SQL"| postgres
+```
 
 Game rules live in a pure `game` package with no HTTP or database code, so they can be unit-tested on their own. The frontend never computes a winner; it only displays what the server returns.
 
 ## Infrastructure and run command
 
-`make up` builds both images, creates a kind cluster, loads the images into it and applies plain Kubernetes manifests. The game is then at `http://localhost:8080`.
+`make up` builds both images, deletes the project's kind cluster if it exists, creates a new one, loads the images into it and applies plain Kubernetes manifests. The game is then at `http://localhost:8080`.
+
+**Cluster lifecycle:** `make up` always recreates the cluster, so each run starts with an empty cluster and database, as a reviewer's first run would. It's for checking what the reviewer will see; day-to-day development uses Docker Compose. `make down` deletes the cluster. Both touch only this project's named cluster. Saved games survive browser refreshes and pod restarts, but **not** `make down` or another `make up`. The README says so.
 
 **Kubernetes resources (`k8s/`)**
 
 - `postgres`: a StatefulSet with one replica, a PersistentVolumeClaim and a Service. Credentials come from a Secret; local-only values are fine.
-- `backend`: a Deployment with 2 replicas (this shows the backend holds no state) and a Service. It reads `DATABASE_URL` from the Secret and has readiness and liveness checks on `/healthz`.
-- `frontend`: a Deployment and a Service. nginx serves the built static files and forwards `/api` to the backend Service, so there are no cross-origin (CORS) issues.
-- Access: a kind port mapping, or `kubectl port-forward` wrapped inside `make up`.
+- `backend`: a Deployment with 2 replicas (this shows the backend holds no state) and a Service. It reads `DATABASE_URL` from the Secret. An init container waits for Postgres before the backend starts.
+- Backend health checks: readiness uses `/healthz`, so a pod that can't reach Postgres gets no traffic. Liveness uses `/livez`, so a database outage doesn't restart the backend. A startup probe on `/livez`, with a generous time limit, holds off liveness checks while Java starts and Flyway runs. The trade-off, for `DECISIONS.md`: a pod whose database connections stay stuck loses traffic but isn't restarted.
+- `frontend`: a Deployment and a Service. nginx serves the built static files and forwards `/api` and exactly `/healthz` to the backend Service, so there are no cross-origin (CORS) issues. It doesn't forward `/livez`. Other unknown paths serve the React app, so refreshing `/game/:id` works.
+- Access: a kind port mapping from `localhost:8080` to a fixed NodePort on the frontend Service. The mapping is defined in `k8s/kind.yaml` and set when the cluster is created, and the port numbers there must match the Service. `make up` passes this file to kind and doesn't apply it with the manifests. It waits until everything is ready, prints the URL and exits. The README notes that port 8080 must be free.
 
 **Database migrations:** Flyway applies versioned SQL files when the backend starts, which Spring Boot supports out of the box. That's fine for this scope; a real project would use a separate migration job.
 
-**Images:** multi-stage Dockerfiles. the backend is built with Maven and runs on a slim Eclipse Temurin JRE image, so no JDK is needed on the host; the frontend is built with Node and served by nginx.
+**Images:** multi-stage Dockerfiles. The backend is built with Maven and runs on a slim Eclipse Temurin JRE image, so no JDK is needed on the host; the frontend is built with Node and served by nginx.
 
-**Dev loop:** `docker compose up` for fast iteration while building, plus `make down` and `make test`.
+**Dev loop:** Docker Compose runs only Postgres. The backend and the Vite development server run directly on the host, for the fastest iteration.
 
-**Prerequisites** (listed in the README): Docker, kind and kubectl.
+- `docker compose up` starts the development database. It persists between restarts, and `docker compose down -v` clears it.
+- The backend runs through the Maven wrapper (`./mvnw spring-boot:run`), so Maven doesn't need to be installed. It uses port 8081 on the host, leaving 8080 for kind. Its default database settings match the Compose database.
+- The app is at `http://localhost:5173`. Vite forwards `/api` and `/healthz` to the backend, as nginx does.
+- The project targets Java 21 (`maven.compiler.release`), even when the host JDK is newer. `make test` and the images use Java 21.
+- `make test` uses a separate Compose project, so its cleanup can't remove development data.
+- This setup doesn't use nginx, so run `make up` at the end of each phase from Phase 2 onward to catch differences, such as a failed refresh on `/game/:id`.
+
+**Prerequisites** (listed in the README): Docker with Docker Compose, kind, kubectl and `make`. These are all that's needed to run and test the project. The dev loop also needs a JDK (21 or newer) and Node on the host.
+
+**Running tests:** `make test` runs everything in containers, so the host needs no JDK or Node. It uses Docker Compose to start a separate, empty Postgres and a Maven container, then removes them, whether the tests pass or fail. Game logic tests run without Spring or a database.
 
 ## Testing and conventions
 
@@ -137,16 +209,17 @@ Put most of the tests on the pure game logic, where bugs would hurt players most
 
 **Tests**
 
-- **Game logic (must):** JUnit 5 parameterized tests. Cover a win in each direction (horizontal, vertical, both diagonals), wins at the board edges, a draw on a full board, a full column, an out-of-range column, a move after the game is over, and turn alternation.
-- **API (should):** a few MockMvc controller tests for the main path and for the 409 cases (stale move number, full column).
-- **Frontend (nice to have):** one component test that clicking a column sends the right move. Skip it if time is short.
+- **Game logic (must):** JUnit 5 parameterized tests. Cover a win in each direction (horizontal, vertical, both diagonals), wins at the board edges, a line longer than four, two winning lines from one move, a draw on a full board, a full column, an out-of-range column, a move after the game is over, and turn alternation.
+- **API (must):** a few MockMvc controller tests against real Postgres, for the main path and for the 409 cases (stale move count, full column). No mocked store and no Testcontainers.
+- **Concurrency (must):** send two moves with the same `moveCount` at the same time. One returns 200, the other returns 409 `STALE_MOVE`, and only one move is saved.
+- **Frontend (nice to have):** one component test that clicking a column sends the right move. Skip it if time is short. If it's added, `make test` runs it in a Node container.
 
 **Repository layout**
 
 ```
 backend/   Maven project; packages game (pure logic), store (JDBC), api (controllers)
 frontend/  src/components (Board, Cell, StatusBar), src/api.ts, src/hooks/useGame.ts
-k8s/       postgres.yaml, backend.yaml, frontend.yaml, secret.yaml
+k8s/       kind.yaml (cluster config), postgres.yaml, backend.yaml, frontend.yaml, secret.yaml
 docs/      PRD.md, DECISIONS.md
 Makefile   up, down, test
 ```
@@ -163,19 +236,20 @@ Makefile   up, down, test
 Work through six phases totalling about 4 hours, with the riskiest part (infrastructure) first. Commit at the end of each phase and note the actual time spent.
 
 1. **Plan (20 min):** finish this PRD and CLAUDE.md. *Done when:* both are committed.
-2. **Walking skeleton (60 min):** repo layout, Dockerfiles, Kubernetes manifests, a backend `/healthz` that pings Postgres, and a frontend that shows the API status. *Done when:* `make up` on a fresh cluster shows "API OK" in the browser.
+2. **Walking skeleton (60 min):** repo layout, Dockerfiles, Kubernetes manifests, a backend `/healthz` that pings Postgres and a `/livez` that doesn't, and a frontend that shows the API status. It shows "API OK" only when `/healthz` returns both status 200 and `{"status": "ok"}`. *Done when:* `make up` on a fresh cluster shows "API OK" in the browser.
 3. **Game logic, storage and API (60 min):** `game` and its tests first, then the migration, the store and the three endpoints. *Done when:* `make test` passes and a full game can be played with curl.
-4. **Frontend (60 min):** board, turn indicator, game-over banner with rematch, routing to `/game/:id`, error handling. *Done when:* a full game can be played in the browser and survives a refresh.
-5. **Polish (25 min):** hover preview, drop animation, keyboard play, mobile layout, then trying to break it. *Done when:* nothing obvious breaks.
-6. **Submission (15 min):** README (single command, screenshot or GIF), DECISIONS.md (trade-offs and what's next), the time breakdown and the transcripts.
+4. **Frontend (70 min):** board, turn indicator, hover preview, keyboard play, phone layout, game-over banner with winning-line highlight and rematch, routing to `/game/:id`, error handling. Replace the API status display with the home screen; keep the `/healthz` nginx rule for checking the whole stack with curl. *Done when:* a full game can be played in the browser, by mouse or keyboard and on a phone-sized portrait screen, and survives a refresh.
+5. **Polish (15 min):** drop animation with its reduce-motion setting, then trying to break it. *Done when:* nothing obvious breaks.
+6. **Submission (15 min):** README (single command, screenshot or GIF), DECISIONS.md (trade-offs and what's next), the time breakdown and the transcripts. Before submitting, build both images once with `docker build --no-cache --pull`, so cached layers can't hide a broken download or build step. `make up` normally uses the cache.
 
-**If a phase overruns by 15 minutes**, cut from Polish first, never from tests or the README. Only start a stretch feature if phase 5 finishes early.
+**If a phase overruns by 15 minutes**, cut from Polish first (the drop animation before the break test), never from Must features, tests or the README. If time runs short, still do a brief break test. Only start a stretch feature after phase 6 is done.
 
 ## Decisions and next steps
 
 - **Backend:** Java 21 + Spring Boot, chosen over Go and PHP.
 - **Frontend:** React + TypeScript (Vite).
 - **One-command run:** kind.
-- **First stretch feature:** the drop animation and hover preview.
+- **Priority levels:** hover preview, keyboard play and phone layout are Must; the drop animation is Polish.
+- **First stretch feature:** online play.
 
-**"What I'd do next"** (for the submission note): real-time online play over WebSockets with matchmaking; accounts and game history with replays; a minimax computer opponent with difficulty levels; end-to-end tests with Playwright;
+**"What I'd do next"** (for the submission note): real-time online play over WebSockets with matchmaking; accounts and game history with replays; a minimax computer opponent with difficulty levels; end-to-end tests with Playwright.
