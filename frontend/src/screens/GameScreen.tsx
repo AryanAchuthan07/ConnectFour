@@ -1,4 +1,5 @@
 import { Board } from '../components/Board'
+import { Rules } from '../components/Rules'
 import { StatusBar } from '../components/StatusBar'
 import { useGame } from '../hooks/useGame'
 import { HomeScreen } from './HomeScreen'
@@ -10,6 +11,7 @@ export function GameScreen({ id }: { id: string }) {
 
   return (
     <main className="screen">
+      <Rules />
       <h1 className="game-title">Connect 4</h1>
       {view.phase === 'loading' && <p>Loading game…</p>}
       {view.phase === 'loadFailed' && (

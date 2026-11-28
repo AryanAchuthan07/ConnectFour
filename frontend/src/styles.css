@@ -20,6 +20,7 @@ body {
 }
 
 .screen {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -31,9 +32,93 @@ h1 {
   margin: 2rem 0 1.5rem;
 }
 
+/* Room above the title for the Rules button, since a long title spans the screen. */
+.home h1 {
+  margin-top: 4rem;
+}
+
+/* As tall as the Rules button beside it, so the button never reaches the row below. */
 .game-title {
-  margin: 4px 0 8px;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 0 4px;
   font-size: 1.25rem;
+}
+
+.rules-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--board);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--board);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.rules-button:focus-visible {
+  outline: 3px solid var(--text);
+  outline-offset: 3px;
+}
+
+/* Leaves a margin all round, so there is always somewhere outside to press. */
+.rules {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--background);
+  text-align: left;
+  line-height: 1.45;
+}
+
+.rules::backdrop {
+  background: rgb(0 0 0 / 55%);
+}
+
+/* Fills the popup, so only presses on the dimmed area count as outside. */
+.rules-content {
+  padding: 0 20px 20px;
+}
+
+/* Stays put while the rules scroll, so Close is always in reach. */
+.rules-header {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0 8px;
+  background: var(--background);
+}
+
+.rules-header h2 {
+  margin: 0;
+}
+
+.rules-content h3 {
+  margin-bottom: 0;
+}
+
+.rules-content ol,
+.rules-content ul {
+  padding-left: 1.4rem;
+}
+
+.rules-content li {
+  margin-bottom: 0.35rem;
 }
 
 .button {
@@ -95,8 +180,8 @@ h1 {
 .board {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  width: min(100%, 560px, calc((100vh - 190px) * 7 / 6));
-  width: min(100%, 560px, calc((100dvh - 190px) * 7 / 6));
+  width: min(100%, 560px, calc((100vh - 202px) * 7 / 6));
+  width: min(100%, 560px, calc((100dvh - 202px) * 7 / 6));
   min-width: 260px;
   padding: 6px;
   border-radius: 12px;

@@ -31,6 +31,7 @@ There are three levels. **Must** features are required to submit. **Polish** com
 | Must | Turn indicator, winning-line highlight, draw state, rematch | Makes the game feel finished |
 | Must | One-command local run on Kubernetes | Explicitly requested |
 | Must | Landing-spot preview for mouse and keyboard | Players should always know where the piece will land |
+| Must | Rules button that explains how to play | A new player can look up the rules and controls without leaving the game |
 | Must | Keyboard play and phone-sized portrait layout | Part of the quality bar, and cheaper to build into the board than to add later |
 | Polish | Drop animation, off when reduce-motion is on | Adds feel, but the game is complete without it |
 | Stretch 1 | Online play from two browsers via a shareable link (polling) | Uses the backend you already have |
@@ -79,6 +80,14 @@ The player should always know whose turn it is, where the piece will land and wh
 - When the game opens, the middle column is focused. Enter or Space drops a piece, and holding the key down doesn't repeat the move. Tab enters the board once. Full or temporarily locked columns are marked unavailable but stay focusable.
 - If the interface itself crashes, a fallback message and a reload button replace the blank screen.
 - If the game at the URL can't be loaded because the ID is invalid or unknown, the screen says "We couldn't find that game" and offers a "New game" button.
+
+**Rules popup**
+
+- A "Rules" button sits in the top right of the home, game and "game not found" screens, without pushing the board off a phone screen.
+- It opens a popup over the current screen, not a third screen. The popup covers how to play and the mouse, touch and keyboard controls. It never opens by itself, and the game must still be playable without reading it.
+- It closes with the Close button, Escape or a press outside it, and keyboard focus returns to the Rules button. Close stays at the top, in view while the rules scroll.
+- While it's open, the board behind can't be used. Opening and closing it sends nothing to the server, and a move already sent still finishes.
+- It uses the browser's `<dialog>` element, with no new dependency. The test browser lacks `showModal`, so blocking the page, Escape and layout are checked in a real browser.
 
 **Quality bar**
 

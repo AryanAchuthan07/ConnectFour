@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { ApiError, createGame } from '../api'
+import { Rules } from '../components/Rules'
 import { useIsMounted } from '../hooks/useIsMounted'
 import { gamePath, navigate } from '../router'
 
@@ -27,7 +28,8 @@ export function HomeScreen({ title = 'Connect 4' }: { title?: string }) {
   }
 
   return (
-    <main className="screen">
+    <main className="screen home">
+      <Rules />
       <h1>{title}</h1>
       <button type="button" className="button" aria-disabled={busy} onClick={startGame}>
         New game
