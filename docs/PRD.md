@@ -77,7 +77,7 @@ The player should always know whose turn it is, where the piece will land and wh
 - Requests time out after 20 seconds, so the controls never stay locked indefinitely.
 - A piece appears only after the server accepts the move.
 - Besides colour, pieces differ in shape: Yellow pieces have a centre ring and Red pieces are solid.
-- When the game opens, the middle column is focused. Enter or Space drops a piece, and holding the key down doesn't repeat the move. Tab enters the board once. Full or temporarily locked columns are marked unavailable but stay focusable.
+- When the game opens, the middle column is focused, but no outline shows until a key is used, on phone or computer. After that the focused column is outlined, until the mouse or touch is used. Enter or Space drops a piece, and holding the key down doesn't repeat the move. Tab enters the board once. Full or temporarily locked columns are marked unavailable but stay focusable.
 - If the interface itself crashes, a fallback message and a reload button replace the blank screen.
 - If the game at the URL can't be loaded because the ID is invalid or unknown, the screen says "We couldn't find that game" and offers a "New game" button.
 
@@ -94,7 +94,9 @@ The player should always know whose turn it is, where the piece will land and wh
 - Works on a phone-sized screen in portrait.
 - Keyboard play: arrow keys pick a column, Enter drops the piece. The focus is visible.
 - Colour isn't the only signal: the turn indicator and result banner also use words.
-- Animation (polish): the piece drops in about 300 ms; turn it off when the system's reduce-motion setting is on.
+- Animation (polish): the piece drops in about 300 ms; turn it off when the system's reduce-motion setting is on. It falls from above the board while the holes stay still, and play doesn't wait for it. No preview shows while a piece is falling; it appears once the piece lands. With reduce motion on, it isn't held back. A new piece drops after an accepted move, or when a reload brings exactly one new piece. Nothing drops when a game is opened or refreshed, or when several pieces arrive at once. A winning highlight starts once the piece has landed; the result text appears at once.
+- In high-contrast (forced colours) modes, the board keeps its own colours and buttons keep a visible edge.
+- When text is large for the screen's width, the Rules button moves to its own row instead of covering the title.
 
 ## Data model and API
 

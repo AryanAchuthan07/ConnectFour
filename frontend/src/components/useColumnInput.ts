@@ -44,6 +44,8 @@ export function useColumnInput() {
   }
 
   return {
+    // The board has focus from the start, but outlines it only once a keyboard is in use.
+    usingKeyboard: source === 'keyboard',
     previewColumn: source === 'keyboard' ? selected : source === 'mouse' ? hovered : null,
     groupProps: {
       onKeyDown,

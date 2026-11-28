@@ -124,7 +124,8 @@ h1 {
 .button {
   min-height: 44px;
   padding: 0.6rem 1.4rem;
-  border: 0;
+  /* Invisible normally. High-contrast modes remove the fill but paint this edge. */
+  border: 2px solid transparent;
   border-radius: 8px;
   background: var(--board);
   color: #fff;
@@ -212,7 +213,13 @@ h1 {
   cursor: not-allowed;
 }
 
-.column:focus-visible {
+/* :focus-visible alone would outline the column focused automatically when a game opens, on
+   phones too. So the outline also waits for a key to be used. */
+.column:focus {
+  outline: none;
+}
+
+.board[data-keyboard='true'] .column:focus-visible {
   outline: 3px solid #fff;
   outline-offset: -3px;
 }
@@ -224,25 +231,29 @@ h1 {
   margin: 7% auto;
   aspect-ratio: 1;
   border-radius: 50%;
-}
-
-.cell[data-piece='.'] {
   background-color: var(--hole);
 }
 
-.cell[data-piece='R'],
+/* The piece in a hole. It covers the hole completely, with no pale rim showing round it. */
+.disc {
+  position: absolute;
+  inset: -0.5px;
+  border-radius: 50%;
+}
+
+.cell[data-piece='R'] .disc,
 .swatch[data-piece='R'] {
   background-color: var(--red);
 }
 
-.cell[data-piece='Y'],
+.cell[data-piece='Y'] .disc,
 .swatch[data-piece='Y'] {
   background-color: var(--yellow);
 }
 
 /* Shape as well as colour: Yellow has a centre ring, Red is solid. */
-.cell[data-piece='Y']::after,
-.cell[data-ghost='Y']::after,
+.cell[data-piece='Y'] .disc::after,
+.cell[data-ghost='Y'] .disc::after,
 .swatch[data-piece='Y']::after {
   content: '';
   position: absolute;
@@ -252,16 +263,16 @@ h1 {
 }
 
 /* The preview: a paler piece with a dashed edge. */
-.cell[data-ghost] {
+.cell[data-ghost] .disc {
   border: 3px dashed;
 }
 
-.cell[data-ghost='R'] {
+.cell[data-ghost='R'] .disc {
   border-color: var(--red);
   background-color: color-mix(in srgb, var(--red) 45%, var(--hole));
 }
 
-.cell[data-ghost='Y'] {
+.cell[data-ghost='Y'] .disc {
   border-color: var(--yellow-ring);
   background-color: color-mix(in srgb, var(--yellow) 55%, var(--hole));
 }
@@ -283,4 +294,68 @@ h1 {
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
+}
+
+/* Motion is added only for players who haven't asked their system to reduce it. */
+@media (prefers-reduced-motion: no-preference) {
+  .cell[data-dropping='true'] .disc {
+    animation: drop 300ms cubic-bezier(0.45, 0, 0.9, 0.6) backwards;
+  }
+
+  /* No preview until the falling piece has landed, so the two never overlap. */
+  .board[data-falling='true'] .cell[data-ghost] .disc {
+    visibility: hidden;
+  }
+
+  /* If that piece wins, wait for it to land before ringing and fading. */
+  .board[data-won='true'][data-landing='true'] .cell[data-winning='true'] {
+    animation: ring-in 150ms 300ms backwards;
+  }
+
+  .board[data-won='true'][data-landing='true'] .cell:not([data-winning='true']) {
+    animation: fade-in 150ms 300ms backwards;
+  }
+}
+
+/* From one place above the top row. Rows are 100 / 86 of a piece apart. */
+@keyframes drop {
+  from {
+    transform: translateY(calc((var(--row) + 1) * -116.28%));
+  }
+}
+
+@keyframes ring-in {
+  from {
+    box-shadow:
+      0 0 0 0 #fff,
+      0 0 0 0 var(--text);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 1;
+  }
+}
+
+/* When the text is large for the screen's width, the button gets its own row instead of
+   covering the title. An em in a media query follows the player's text size. */
+@media (max-width: 18em) {
+  .rules-button {
+    position: static;
+    align-self: flex-end;
+  }
+
+  .home h1 {
+    margin-top: 1rem;
+  }
+}
+
+/* High-contrast modes replace page colours, which turned the whole board black. On the board,
+   the colours are the game itself, so keep them. Yellow's ring still sets it apart from Red. */
+@media (forced-colors: active) {
+  .board,
+  .swatch {
+    forced-color-adjust: none;
+  }
 }

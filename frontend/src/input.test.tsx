@@ -210,3 +210,49 @@ describe('touch', () => {
     expect(ghosts()).toEqual([])
   })
 })
+
+describe('the focus outline', () => {
+  // The outline's style applies only while the board says the keyboard is in use.
+  const outlineAllowed = () => screen.getByRole('group', { name: 'Game board' }).dataset.keyboard
+
+  test('is off when the game opens, although the middle column has focus', async () => {
+    await open()
+
+    expect(focusedColumn()).toBe(3)
+    expect(outlineAllowed()).toBe('false')
+  })
+
+  test.each([
+    ['an arrow key', '{ArrowRight}'],
+    ['Enter on a full column', '{ArrowLeft>3/}{Enter}'],
+  ])('comes on with %s', async (_name, keys) => {
+    const { user } = await open()
+
+    await user.keyboard(keys)
+
+    expect(outlineAllowed()).toBe('true')
+  })
+
+  test('comes on when Tab enters the board', async () => {
+    const { user } = await open()
+    await user.tab()
+
+    await user.tab({ shift: true })
+
+    expect(focusedColumn()).toBe(3)
+    expect(outlineAllowed()).toBe('true')
+  })
+
+  test.each([
+    ['the mouse', (user: ReturnType<typeof userEvent.setup>) => user.hover(columns()[1])],
+    ['touch', (user: ReturnType<typeof userEvent.setup>) =>
+      user.pointer({ keys: '[TouchA]', target: columns()[0] })],
+  ])('goes off again with %s', async (_name, use) => {
+    const { user } = await open()
+    await user.keyboard('{ArrowRight}')
+
+    await use(user)
+
+    expect(outlineAllowed()).toBe('false')
+  })
+})

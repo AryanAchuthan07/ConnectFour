@@ -1,13 +1,16 @@
 export type Player = 'R' | 'Y'
 export type Cell = '.' | Player
 
+/** `[row, col]`. */
+export type Position = [number, number]
+
 /** The game object every game endpoint returns. `board[row][col]`, with row 0 at the top. */
 export interface Game {
   id: string
   board: Cell[][]
   currentPlayer: Player
   status: 'in_progress' | 'red_won' | 'yellow_won' | 'draw'
-  winningCells: [number, number][] | null
+  winningCells: Position[] | null
   moveCount: number
 }
 
