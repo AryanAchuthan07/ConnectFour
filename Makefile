@@ -32,4 +32,4 @@ down:
 
 ## Run tests against a temporary Postgres, then remove it whether they pass or fail.
 test:
-	@trap '$(TEST_COMPOSE) down --remove-orphans' EXIT; $(TEST_COMPOSE) run --rm backend-tests
+	@trap '$(TEST_COMPOSE) down --remove-orphans' EXIT; $(TEST_COMPOSE) run --rm backend-tests && $(TEST_COMPOSE) run --rm frontend-tests

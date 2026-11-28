@@ -29,6 +29,17 @@ services:
     # Builds from a copy, so container output never mixes with the host's target/ folder.
     command: >
       sh -c "mkdir /work && cp -r /source/pom.xml /source/src /work/ && cd /work && mvn -B test"
+  frontend-tests:
+    image: node:24-alpine
+    volumes:
+      - ./frontend:/source:ro
+      - npm-cache:/root/.npm
+    # Works on a copy without the host's node_modules, which may be built for another system.
+    command: >
+      sh -c "mkdir /work && cd /source &&
+      cp -r package.json package-lock.json tsconfig.json vite.config.ts src /work/ &&
+      cd /work && npm ci --no-fund --no-audit && npm run typecheck && npm test"
 volumes:
   # Kept between runs so dependencies are downloaded once.
   maven-cache:
+  npm-cache:
