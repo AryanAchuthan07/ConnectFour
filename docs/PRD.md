@@ -148,6 +148,15 @@ Errors use a single shape: `{"error": {"code": "COLUMN_FULL", "message": "That c
 | 5 | The column is from 0 to 6 | 400 | `INVALID_COLUMN` | That column doesn't exist. |
 | 6 | The column has space | 409 | `COLUMN_FULL` | That column is full. |
 
+**Requests outside the API:** these use the same error shape.
+
+| Case | Status | Code | Message |
+| --- | --- | --- | --- |
+| Unknown `/api` path | 404 | `NOT_FOUND` | We couldn't find that. |
+| Wrong method on a supported path | 405 | `METHOD_NOT_ALLOWED` | That action isn't allowed. |
+
+**Strict move requests:** `column` and `moveCount` must be JSON integers that fit in 32 bits. Strings, decimals, booleans, `null` and missing fields are an `INVALID_REQUEST`. Game IDs must be in the standard 36-character UUID format. Extra fields are ignored, and the body is read as JSON whatever content type the request claims.
+
 Unexpected errors return 500 `INTERNAL_ERROR` with "Something went wrong. Please try again." They use the same shape and don't expose internal details. The wrong-turn rejection gets its place in this order when online play is built, because requests don't yet say which player is moving.
 
 **Move handling:** in one transaction, lock the game row (`SELECT … FOR UPDATE`), check that the request's `moveCount` equals `move_count`, run the pure game logic, insert into `moves` with `move_number = move_count + 1`, update `games` (including incrementing `move_count`), then commit.
@@ -184,6 +193,7 @@ Game rules live in a pure `game` package with no HTTP or database code, so they 
 - `postgres`: a StatefulSet with one replica, a PersistentVolumeClaim and a Service. Credentials come from a Secret; local-only values are fine.
 - `backend`: a Deployment with 2 replicas (this shows the backend holds no state) and a Service. It reads `DATABASE_URL` from the Secret. An init container waits for Postgres before the backend starts.
 - Backend health checks: readiness uses `/healthz`, so a pod that can't reach Postgres gets no traffic. Liveness uses `/livez`, so a database outage doesn't restart the backend. A startup probe on `/livez`, with a generous time limit, holds off liveness checks while Java starts and Flyway runs. The trade-off, for `DECISIONS.md`: a pod whose database connections stay stuck loses traffic but isn't restarted.
+- Backend shutdown: a `preStop` hook waits 5 seconds before a pod being replaced shuts down, so Kubernetes can stop sending it traffic first. This needs a Kubernetes version that supports the `sleep` hook; kind 0.33.0 does. In testing without it, 9 of 467 health checks failed with 504 across three backend restarts. With it, all 474 succeeded. That doesn't guarantee a restart never drops a request.
 - `frontend`: a Deployment and a Service. nginx serves the built static files and forwards `/api` and exactly `/healthz` to the backend Service, so there are no cross-origin (CORS) issues. It doesn't forward `/livez`. Other unknown paths serve the React app, so refreshing `/game/:id` works.
 - Access: a kind port mapping from port 8080 on all of the host's network interfaces to a fixed NodePort on the frontend Service. The app is at `http://localhost:8080` on the host and at `http://<host IP>:8080` from other devices on the same network. There are no accounts, so anyone who can reach that address can use the app. Only the app is exposed; the development database accepts local connections only. The mapping is defined in `k8s/kind.yaml` and set when the cluster is created, and the port numbers there must match the Service. `make up` passes this file to kind and doesn't apply it with the manifests. It waits until everything is ready, prints both URLs and exits. The README notes that port 8080 must be free, and that a firewall or a network that isolates devices can block access from other devices.
 
