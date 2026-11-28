@@ -256,7 +256,7 @@ Put most of the tests on the pure game logic, where bugs would hurt players most
 backend/   Maven project; packages game (pure logic), store (JDBC), api (controllers)
 frontend/  src/components (Board, Cell, StatusBar), src/screens (HomeScreen, GameScreen), src/api.ts, src/router.ts, src/hooks/useGame.ts
 k8s/       kind.yaml (cluster config), postgres.yaml, backend.yaml, frontend.yaml, secret.yaml
-docs/      PRD.md, DECISIONS.md
+docs/      PRD.md, DECISIONS.md, TRANSCRIPT.md, images/ (README screenshots)
 scripts/   setup.sh (installs the required tools)
 Makefile   up, down, test
 ```
@@ -270,14 +270,14 @@ Makefile   up, down, test
 
 ## Build phases and time budget
 
-Work through six phases totalling about 4 hours, with the riskiest part (infrastructure) first. Commit at the end of each phase and note the actual time spent.
+Work through six phases totalling about 4 hours, with the riskiest part (infrastructure) first. Commit at the end of each phase.
 
 1. **Plan (20 min):** finish this PRD and CLAUDE.md. *Done when:* both are committed.
 2. **Walking skeleton (60 min):** repo layout, Dockerfiles, Kubernetes manifests, a backend `/healthz` that pings Postgres and a `/livez` that doesn't, and a frontend that shows the API status. It shows "API OK" only when `/healthz` returns both status 200 and `{"status": "ok"}`. *Done when:* `make up` on a fresh cluster shows "API OK" in the browser.
 3. **Game logic, storage and API (60 min):** `game` and its tests first, then the migration, the store and the three endpoints. *Done when:* `make test` passes and a full game can be played with curl.
 4. **Frontend (70 min):** board, turn indicator, hover preview, keyboard play, phone layout, game-over banner with winning-line highlight and rematch, routing to `/game/:id`, error handling. Replace the API status display with the home screen; keep the `/healthz` nginx rule for checking the whole stack with curl. *Done when:* a full game can be played in the browser, by mouse or keyboard and on a phone-sized portrait screen, and survives a refresh.
 5. **Polish (15 min):** drop animation with its reduce-motion setting, then trying to break it. *Done when:* nothing obvious breaks.
-6. **Submission (15 min):** README (setup command, single run command, screenshot or GIF), DECISIONS.md (trade-offs and what's next), the time breakdown and the transcripts. Before submitting, build both images once with `docker build --no-cache --pull`, so cached layers can't hide a broken download or build step. `make up` normally uses the cache.
+6. **Submission (15 min):** README (setup command, single run command, two screenshots), DECISIONS.md (trade-offs and what's next) and the transcript in `docs/TRANSCRIPT.md`, as an edited, readable copy with private details removed. Before submitting, build both images once with `docker build --no-cache --pull`, so cached layers can't hide a broken download or build step. `make up` normally uses the cache.
 
 **If a phase overruns by 15 minutes**, cut from Polish first (the drop animation before the break test), never from Must features, tests or the README. If time runs short, still do a brief break test. Only start a stretch feature after phase 6 is done.
 

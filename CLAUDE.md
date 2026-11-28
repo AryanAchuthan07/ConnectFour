@@ -48,5 +48,4 @@ The host may have a newer JDK, so the build sets `maven.compiler.release` to 21.
 
 - Follow the PRD's phases and priorities: Must, then Polish; Stretch only after submission work is done.
 - Make small commits with clear messages, one logical step at a time, including one at the end of each phase.
-- Note the actual time spent on each phase.
 - Record trade-offs in `docs/DECISIONS.md`.
