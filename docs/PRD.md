@@ -71,7 +71,13 @@ The player should always know whose turn it is, where the piece will land and wh
 - After a move, disable input until the server responds, so a double-click can't send two moves.
 - When the game ends, a banner shows the result ("Red wins" or "Draw"), all winning cells are highlighted, and a "Play again" button appears.
 - A server error shows a short, friendly message, never a blank screen. For a network failure or a response it can't read, such as an nginx 502 or 504 page, the frontend shows "Can't reach the server. Please try again."
-- After any 409, the frontend fetches the game again and keeps showing the error message, so an out-of-date tab recovers without a refresh.
+- After any 409, the frontend fetches the game again and keeps showing the error message, so an out-of-date tab recovers without a refresh. It does the same after a failed move caused by a network failure, a timeout, an unreadable response or a server error, because the move may have been saved even though the response was lost. If reloading also fails, moves stay locked and a "Try again" button appears.
+- If a game can't be loaded for any other reason, such as an unreachable server, the screen shows the error with a "Try again" button.
+- Requests time out after 20 seconds, so the controls never stay locked indefinitely.
+- A piece appears only after the server accepts the move.
+- Besides colour, pieces differ in shape: Yellow pieces have a centre ring and Red pieces are solid.
+- When the game opens, the middle column is focused. Enter or Space drops a piece, and holding the key down doesn't repeat the move. Tab enters the board once. Full or temporarily locked columns are marked unavailable but stay focusable.
+- If the interface itself crashes, a fallback message and a reload button replace the blank screen.
 - If the game at the URL can't be loaded because the ID is invalid or unknown, the screen says "We couldn't find that game" and offers a "New game" button.
 
 **Quality bar**
@@ -210,7 +216,7 @@ Game rules live in a pure `game` package with no HTTP or database code, so they 
 - `make test` uses a separate Compose project, so its cleanup can't remove development data.
 - This setup doesn't use nginx, so run `make up` at the end of each phase from Phase 2 onward to catch differences, such as a failed refresh on `/game/:id`.
 
-**Prerequisites** (listed in the README): Docker with Docker Compose and Buildx, kind, kubectl and `make`. These are all that's needed to run and test the project. The dev loop also needs a JDK (21 or newer) and Node (20.19+ or 22.12+) on the host. On Windows, run the commands inside WSL2.
+**Prerequisites** (listed in the README): Docker with Docker Compose and Buildx, kind, kubectl and `make`. These are all that's needed to run and test the project. The dev loop also needs a JDK (21 or newer) and Node (22.22.2+ within version 22, 24.15+ within version 24, or 26 or newer, as the test tools require) on the host. On Windows, run the commands inside WSL2.
 
 **Setup script:** `./scripts/setup.sh` installs the tools needed to run and test, and `--dev` adds a JDK, Node and the frontend libraries. `--dry-run` shows what it would install. It skips tools that are already there and checks that Docker is running.
 
@@ -231,13 +237,13 @@ Put most of the tests on the pure game logic, where bugs would hurt players most
 - **Game logic (must):** JUnit 5 parameterized tests. Cover a win in each direction (horizontal, vertical, both diagonals), wins at the board edges, a line longer than four, two winning lines from one move, a draw on a full board, a full column, an out-of-range column, a move after the game is over, and turn alternation.
 - **API (must):** a few MockMvc controller tests against real Postgres, for the main path and for the 409 cases (stale move count, full column). No mocked store and no Testcontainers.
 - **Concurrency (must):** send two moves with the same `moveCount` at the same time. One returns 200, the other returns 409 `STALE_MOVE`, and only one move is saved.
-- **Frontend (nice to have):** one component test that clicking a column sends the right move. Skip it if time is short. If it's added, `make test` runs it in a Node container.
+- **Frontend (must):** Vitest with jsdom, React Testing Library and User Event, all development-only. Tests cover `api.ts` and the displayed app, with only `fetch` faked. `make test` type-checks and runs them in a Node container. A simulated browser can't check layout or visible focus, so styling is checked in a real browser.
 
 **Repository layout**
 
 ```
 backend/   Maven project; packages game (pure logic), store (JDBC), api (controllers)
-frontend/  src/components (Board, Cell, StatusBar), src/api.ts, src/hooks/useGame.ts
+frontend/  src/components (Board, Cell, StatusBar), src/screens (HomeScreen, GameScreen), src/api.ts, src/router.ts, src/hooks/useGame.ts
 k8s/       kind.yaml (cluster config), postgres.yaml, backend.yaml, frontend.yaml, secret.yaml
 docs/      PRD.md, DECISIONS.md
 scripts/   setup.sh (installs the required tools)

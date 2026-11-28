@@ -31,7 +31,8 @@ Update this section if any command changes. The development database is on host 
 | `docker compose up` | Start the development database only |
 | `cd backend && ./mvnw spring-boot:run` | Run the backend on port 8081 |
 | `cd frontend && npm run dev` | Run Vite at `http://localhost:5173` |
-| `make test` | Run tests in containers against a temporary Postgres, in a separate Compose project |
+| `cd frontend && npm test` | Run the frontend tests (`npm run typecheck` checks types) |
+| `make test` | Run backend tests against a temporary Postgres, then the frontend type check and tests, all in containers in a separate Compose project |
 | `make up` | Recreate the kind cluster and serve the app on port 8080, to this computer and others on the same network. **Erases saved games** |
 | `make down` | Delete the kind cluster. **Erases saved games** |
 

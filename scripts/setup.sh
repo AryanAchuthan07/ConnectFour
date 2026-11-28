@@ -77,11 +77,12 @@ jdk_ok() {
   [ -n "$major" ] && [ "$major" -ge "$MIN_JAVA" ]
 }
 
-# Vite needs Node 20.19+, or 22.12+. Odd-numbered 21.x isn't supported.
+# The frontend's test tools need Node 22.22.2+ (within 22), 24.15+ (within 24), or 26+.
 node_ok() {
   have node && have npm || return 1
   node -e 'const [a, b] = process.versions.node.split(".").map(Number);
-           process.exit((a === 20 && b >= 19) || (a === 22 && b >= 12) || a > 22 ? 0 : 1)'
+           const patch = Number(process.versions.node.split(".")[2]);
+           process.exit((a === 22 && (b > 22 || (b === 22 && patch >= 2))) || (a === 24 && b >= 15) || a >= 26 ? 0 : 1)'
 }
 
 # ---------- macOS ----------
@@ -261,7 +262,7 @@ case "$(uname -s)" in
     if [ -r /etc/os-release ] && (. /etc/os-release && [ "${ID:-}" = ubuntu ]); then
       setup_ubuntu
     else
-      die "This script supports Ubuntu only on Linux. Install Docker (with Compose and Buildx), kind, kubectl and make yourself. For development, also install a JDK $MIN_JAVA+ and Node 22.12+."
+      die "This script supports Ubuntu only on Linux. Install Docker (with Compose and Buildx), kind, kubectl and make yourself. For development, also install a JDK $MIN_JAVA+ and Node 24.15+ (or 22.22.2+ within 22, or 26+)."
     fi
     ;;
   *) die "Unsupported system. On Windows, run this inside Ubuntu on WSL2." ;;
