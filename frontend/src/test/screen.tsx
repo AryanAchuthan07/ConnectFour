@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { App } from '../App'
 import type { Game } from '../api'
 import { json, type fakeServer } from './fakeServer'
@@ -14,6 +14,13 @@ export async function openGame(server: ReturnType<typeof fakeServer>, loaded: Ga
   server.will(json(200, loaded))
   const view = openPath(`/game/${loaded.id ?? GAME_ID}`)
   await screen.findByRole('group', { name: 'Game board' })
+  // The board focuses a column just after it appears. On a slow computer that can come late
+  // enough for a test to run first, so wait for it.
+  await waitFor(() => {
+    if (!columns().includes(document.activeElement as HTMLButtonElement)) {
+      throw new Error('The board has not focused a column yet')
+    }
+  })
   return view
 }
 
